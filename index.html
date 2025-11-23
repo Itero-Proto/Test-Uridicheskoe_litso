@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#007bff">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Тест: Юридическое лицо</title>
+
+  <!-- Подключаем внешний CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js");
+  });
+}
+</script>
+
+<body>
+
+  <h1>Тест по теме «Юридическое лицо»</h1>
+
+  <div class="mode-wrap">
+    <label style="font-size:18px;font-weight:600;">
+      <input type="checkbox" id="examModeToggle" style="transform:scale(1.25);margin-right:8px;vertical-align:middle;">
+      Режим «Экзамен»
+    </label>
+  </div>
+
+  <div id="progress"></div>
+  <div id="quiz-container"></div>
+
+  <div style="max-width:600px;margin:12px auto 0;">
+    <button id="nextBtn" onclick="startTest()">Начать</button>
+  </div>
+
+<script>
+// ---------------------- QUESTIONS ----------------------
+const questions = [
+  { text: "Что такое юридическое лицо?", options: ["Физическое лицо, занимающееся предпринимательством", "Организация, имеющая самостоятельные права и обязанности", "Государственный орган"], correct: 1 },
+  { text: "Какой из признаков относится к юридическому лицу?", options: ["Наличие личного имущества у учредителя", "Организационное единство", "Наличие трудового договора"], correct: 1 },
+  { text: "Что означает имущественная обособленность юридического лица?", options: ["Имущество организации отделено от имущества учредителей", "Учредители могут свободно распоряжаться имуществом организации", "Имущество принадлежит государству"], correct: 0 },
+  { text: "Что означает организационная обособленность?", options: ["Наличие уставных документов и органов управления", "Наличие банковского счёта", "Наличие имущества"], correct: 0 },
+  { text: "Когда юридическое лицо приобретает правоспособность?", options: ["С момента подписания устава", "С момента государственной регистрации", "С момента начала хозяйственной деятельности"], correct: 1 },
+  { text: "Какой орган ведёт ЕГР юридических лиц и ИП в Беларуси?", options: ["Министерство юстиции", "Налоговая инспекция", "Регистрирующий орган по месту нахождения"], correct: 2 },
+  { text: "Что означает ликвидация юридического лица?", options: ["Прекращение деятельности с переходом прав", "Прекращение деятельности без правопреемства", "Временная приостановка деятельности"], correct: 1 },
+  { text: "Какие бывают основания ликвидации юридического лица?", options: ["Только добровольные", "Только по решению суда", "Добровольные и принудительные"], correct: 2 }
+];
+
+// ---------------------- STATE ----------------------
+let examMode = false;
+let shuffled = [];
+let current = 0;
+let score = 0;
+let answerShown = false;
+
+// Fisher-Yates
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+document.getElementById('examModeToggle')
+  .addEventListener('change', e => { examMode = e.target.checked; });
+
+
+// ---------------------- START TEST ----------------------
+function startTest() {
+  shuffled = shuffle([...questions]);
+  current = 0;
+  score = 0;
+  answerShown = false;
+  loadQuestion();
+}
+
+
+// ---------------------- LOAD QUESTION ----------------------
+function loadQuestion() {
+  const container = document.getElementById('quiz-container');
+  const progress = document.getElementById('progress');
+  const nextBtn = document.getElementById('nextBtn');
+
+  progress.innerText = `Вопрос ${current + 1} из ${shuffled.length}`;
+  const q = shuffled[current];
+
+  // перемешиваем варианты + сохраняем правильный индекс
+  const opts = q.options.map((opt, i) => ({ opt, i }));
+  shuffle(opts);
+  q.shuffledOpts = opts;
+  q.correctShuffled = opts.findIndex(o => o.i === q.correct);
+
+  container.innerHTML = `
+    <div class="card">
+      <p><strong>${escapeHtml(q.text)}</strong></p>
+      ${q.shuffledOpts.map((o, i) => `
+        <label style="display:block;line-height:1.5;margin:6px 0;">
+          <input type="radio" name="q${current}" value="${i}">
+          ${escapeHtml(o.opt)}
+        </label>
+      `).join('')}
+      <div class="answer-box" id="answerBox"></div>
+    </div>
+  `;
+
+  const answerBox = document.getElementById('answerBox');
+  answerBox.style.display = 'none';
+
+  if (examMode) {
+    nextBtn.innerText = 'Далее';
+    nextBtn.onclick = submitExamAnswer;
+  } else {
+    nextBtn.innerText = 'Показать ответ';
+    nextBtn.onclick = showAnswer;
+  }
+
+  answerShown = false;
+}
+
+
+// ---------------------- STUDY MODE ----------------------
+function showAnswer() {
+  const q = shuffled[current];
+  const selectedEl = document.querySelector(`input[name=q${current}]:checked`);
+  const answerBox = document.getElementById('answerBox');
+  const nextBtn = document.getElementById('nextBtn');
+
+  if (!selectedEl) return alert('Выберите вариант ответа!');
+
+  const selected = parseInt(selectedEl.value);
+
+  if (selected === q.correctShuffled) score++;
+
+  answerBox.style.display = 'block';
+
+  if (selected === q.correctShuffled) {
+    answerBox.innerHTML = '<span class="correct">Верно!</span>';
+  } else {
+    answerBox.innerHTML =
+      `<span class="wrong">Неверно.</span><br>Правильный ответ: <strong>${escapeHtml(q.shuffledOpts[q.correctShuffled].opt)}</strong>`;
+  }
+
+  nextBtn.innerText = (current + 1 === shuffled.length) ? 'Завершить' : 'Далее';
+  nextBtn.onclick = nextQuestion;
+
+  answerShown = true;
+}
+
+
+// ---------------------- EXAM MODE ----------------------
+function submitExamAnswer() {
+  const q = shuffled[current];
+  const selectedEl = document.querySelector(`input[name=q${current}]:checked`);
+
+  if (!selectedEl) return alert('Выберите вариант ответа!');
+
+  const selected = parseInt(selectedEl.value);
+  if (selected === q.correctShuffled) score++;
+
+  answerShown = true;
+  nextQuestion();
+}
+
+
+// ---------------------- NEXT QUESTION ----------------------
+function nextQuestion() {
+  if (!answerShown) return;
+
+  current++;
+
+  if (current >= shuffled.length) return finish();
+
+  loadQuestion();
+}
+
+
+// ---------------------- FINISH ----------------------
+function finish() {
+  const container = document.getElementById('quiz-container');
+  const nextBtn = document.getElementById('nextBtn');
+  const progress = document.getElementById('progress');
+
+  progress.innerText = '';
+
+  container.innerHTML = `
+    <div class="card" style="text-align:center;">
+      <h2>Тест завершён!</h2>
+      <p>Ваш результат:</p>
+      <h1>${score} / ${shuffled.length}</h1>
+    </div>
+  `;
+
+  nextBtn.innerText = 'Пройти заново';
+  nextBtn.onclick = startTest;
+}
+
+
+// ---------------------- SANITIZE ----------------------
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+</script>
+
+</body>
+</html>
