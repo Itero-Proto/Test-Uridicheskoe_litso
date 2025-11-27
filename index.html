@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <audio id="correctSound" src="sounds/correct.mp3"></audio>
+  <audio id="wrongSound" src="sounds/wrong.mp3"></audio>
 
   <title>Тест: Трудовое право</title>
 
@@ -15,12 +17,15 @@
 
   <h1>Тест по теме «Трудовое право»</h1>
 
+  <div id="exam-mode-container">
   <div class="mode-wrap">
     <label style="font-size:18px;font-weight:600;">
       <input type="checkbox" id="examModeToggle" style="transform:scale(1.25);margin-right:8px;vertical-align:middle;">
       Режим «Экзамен»
     </label>
   </div>
+</div>
+
 
   <div id="progress"></div>
   <div id="quiz-container"></div>
@@ -265,8 +270,9 @@ function startTest() {
   score = 0;
   answerShown = false;
   loadQuestion();
+  // 🔥 Скрываем переключатель режима экзамена
+    document.getElementById("exam-mode-container").style.display = "none";
 }
-
 /* -------- LOAD QUESTION -------- */
 function loadQuestion() {
   const container = document.getElementById('quiz-container');
@@ -279,14 +285,18 @@ function loadQuestion() {
   const opts = q.options.map((opt, i) => ({ opt, i }));
   shuffle(opts);
   q.shuffledOpts = opts;
-  q.correctShuffled = opts.findIndex(o => o.i === q.correct);
+
+  // correctShuffled превращаем в массив
+  q.correctShuffled = q.correct.map(
+    c => opts.findIndex(o => o.i === c)
+  );
 
   container.innerHTML = `
     <div class="card">
       <p><strong>${escapeHtml(q.text)}</strong></p>
       ${opts.map((o, i) => `
         <label style="display:block;line-height:1.5;margin:6px 0;">
-          <input type="radio" name="q${current}" value="${i}">
+          <input type="checkbox" name="q${current}" value="${i}">
           ${escapeHtml(o.opt)}
         </label>
       `).join('')}
@@ -307,31 +317,46 @@ function loadQuestion() {
 
   answerShown = false;
 }
-
+/* -------- MULTI-CHECK COMPARISON -------- */
+function isCorrect(selected, correct) {
+  if (selected.length !== correct.length) return false;
+  return [...selected].sort().join(",") === [...correct].sort().join(",");
+}
 /* -------- STUDY MODE -------- */
 function showAnswer() {
   const q = shuffled[current];
-  const selectedEl = document.querySelector(`input[name=q${current}]:checked`);
+  const checkboxes = [...document.querySelectorAll(`input[name=q${current}]:checked`)];
+  if (checkboxes.length === 0) return alert('Выберите хотя бы один вариант!');
 
-  if (!selectedEl) return alert('Выберите вариант ответа!');
+  const selected = checkboxes.map(c => parseInt(c.value));
 
-  const selected = parseInt(selectedEl.value);
   const answerBox = document.getElementById('answerBox');
-  const nextBtn = document.getElementById('nextBtn');
-
-  if (selected === q.correctShuffled) score++;
-
   answerBox.style.display = 'block';
 
-  if (selected === q.correctShuffled) {
-    answerBox.innerHTML = '<span class="correct">Верно!</span>';
-  } else {
+  if (isCorrect(selected, q.correctShuffled)) {
+    score++;
+    answerBox.innerHTML = `<span class="correct">Верно!</span>`;
+
+    // 🔥 эффект правильного ответа
+    playCorrectSound();
+    addSmile();
+
+} else {
     answerBox.innerHTML = `
       <span class="wrong">Неверно.</span><br>
-      Правильный ответ: <strong>${escapeHtml(q.shuffledOpts[q.correctShuffled].opt)}</strong>
+      Правильные ответы:<br>
+      <strong>
+        ${q.correctShuffled.map(i => escapeHtml(q.shuffledOpts[i].opt)).join("<br>")}
+      </strong>
     `;
-  }
 
+    // 🔥 эффект неправильного ответа
+    playWrongSound();
+    removeRandomSmile();
+}
+
+
+  const nextBtn = document.getElementById('nextBtn');
   nextBtn.innerText = (current + 1 === shuffled.length) ? 'Завершить' : 'Далее';
   nextBtn.onclick = nextQuestion;
 
@@ -341,12 +366,24 @@ function showAnswer() {
 /* -------- EXAM MODE -------- */
 function submitExamAnswer() {
   const q = shuffled[current];
-  const selectedEl = document.querySelector(`input[name=q${current}]:checked`);
+  const checkboxes = [...document.querySelectorAll(`input[name=q${current}]:checked`)];
+  if (checkboxes.length === 0) return alert('Выберите хотя бы один вариант!');
 
-  if (!selectedEl) return alert('Выберите вариант ответа!');
+  const selected = checkboxes.map(c => parseInt(c.value));
+  if (isCorrect(selected, q.correctShuffled)) {
+    score++;
 
-  const selected = parseInt(selectedEl.value);
-  if (selected === q.correctShuffled) score++;
+    // 🔥 эффект правильного ответа
+    playCorrectSound();
+    addSmile();
+
+} else {
+
+    // 🔥 эффект неправильного ответа
+    playWrongSound();
+    removeRandomSmile();
+}
+
 
   answerShown = true;
   nextQuestion();
@@ -378,6 +415,8 @@ function finish() {
 
   nextBtn.innerText = 'Пройти заново';
   nextBtn.onclick = startTest;
+  // 🔥 Показываем режим экзамена снова
+    document.getElementById("exam-mode-container").style.display = "block";
 }
 
 /* HTML escape */
@@ -389,15 +428,33 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-</script>
+function addSmile() {
+  const smile = document.createElement("div");
+  smile.className = "smile";
+  smile.textContent = "😊";
 
-<!-- Register service worker -->
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/Test-TrudovoePravo/sw.js")
-    .then(() => console.log("SW registered"))
-    .catch(err => console.error("SW registration failed", err));
+  // Случайная позиция
+  smile.style.left = Math.random() * (window.innerWidth - 50) + "px";
+  smile.style.top = Math.random() * (window.innerHeight - 50) + "px";
+
+  // Добавляем на экран
+  document.body.appendChild(smile);
 }
+function removeRandomSmile() {
+  const smiles = document.querySelectorAll(".smile");
+  if (smiles.length === 0) return;
+
+  const random = Math.floor(Math.random() * smiles.length);
+  smiles[random].remove();
+}
+function playCorrectSound() {
+  document.getElementById("correctSound").play();
+}
+
+function playWrongSound() {
+  document.getElementById("wrongSound").play();
+}
+
 </script>
 
 </body>

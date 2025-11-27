@@ -69,3 +69,19 @@ button:active { transform: scale(0.97); }
   body { padding: 14px; }
   button { font-size: 16px; padding: 12px; }
 }
+.smile {
+  position: absolute;
+  font-size: 40px;
+  animation: float 4s infinite ease-in-out;
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(20px, -30px); }
+  50% { transform: translate(-20px, 20px); }
+  75% { transform: translate(30px, 10px); }
+  100% { transform: translate(0, 0); }
+}
+
